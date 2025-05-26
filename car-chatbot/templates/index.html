@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AI Car Comparison Bot</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #eceff1;
+      margin: 0;
+      padding: 40px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      font-size: 28px;
+      color: #222;
+    }
+
+    input, button {
+      padding: 14px;
+      font-size: 16px;
+      margin: 8px;
+      width: 340px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    input:focus {
+      border-color: #4caf50;
+      outline: none;
+    }
+
+    button {
+      background-color: #4caf50;
+      color: white;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      border: none;
+    }
+
+    button:hover {
+      background-color: #388e3c;
+    }
+
+    #comparison {
+      margin-top: 30px;
+      background: #ffffff;
+      padding: 25px;
+      width: 90%;
+      max-width: 800px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+      white-space: pre-wrap;
+      line-height: 1.6;
+      font-size: 16px;
+      color: #333;
+    }
+
+    .error {
+      color: #d32f2f;
+      margin-top: 20px;
+      font-weight: bold;
+    }
+
+    .loading {
+      font-style: italic;
+      margin-top: 20px;
+      color: #555;
+    }
+
+    #questions-box {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 25px;
+      margin-top: 30px;
+      width: 360px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    }
+
+    #questions-box h3 {
+      margin-top: 0;
+      color: #333;
+    }
+
+    label {
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <h1>🚘 AI Car Comparison Bot</h1>
+
+  <input type="text" id="description" placeholder="e.g. 2020 Audi RS5 Sportback">
+  <button onclick="compareCars()">Compare Cars</button>
+
+  <div id="questions-box" style="display:none;"></div>
+  <div id="comparison"></div>
+  <div id="message"></div>
+
+  <script>
+    let lastAskedQuestions = [];
+
+    function compareCars() {
+      const description = document.getElementById('description').value;
+      const comparisonDiv = document.getElementById('comparison');
+      const questionsBox = document.getElementById('questions-box');
+      const messageDiv = document.getElementById('message');
+
+      comparisonDiv.innerHTML = '';
+      questionsBox.style.display = 'none';
+      messageDiv.innerHTML = '<div class="loading">🚧 Thinking...</div>';
+
+      fetch('/compare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description })
+      })
+      .then(res => res.json())
+      .then(data => {
+        messageDiv.innerHTML = '';
+
+        if (data.error) {
+          messageDiv.innerHTML = `<div class="error">❌ ${data.error}</div>`;
+          return;
+        }
+
+        if (data.follow_up) {
+          lastAskedQuestions = data.questions;
+          showFollowUpQuestions(data.questions);
+          return;
+        }
+
+        if (data.result) {
+          comparisonDiv.innerText = data.result;
+        } else {
+          messageDiv.innerHTML = `<div class="error">⚠️ Unexpected response format</div>`;
+        }
+      })
+      .catch(err => {
+        messageDiv.innerHTML = `<div class="error">❌ Something went wrong.</div>`;
+        console.error(err);
+      });
+    }
+
+    function showFollowUpQuestions(questions) {
+      const questionsBox = document.getElementById('questions-box');
+      questionsBox.innerHTML = `<h3>🤔 Just a few more details:</h3>`;
+      questions.forEach((q, idx) => {
+        questionsBox.innerHTML += `
+          <label>${q}</label><br>
+          <input type="text" id="answer-${idx}" /><br><br>
+        `;
+      });
+      questionsBox.innerHTML += `<button onclick="submitFollowUp()">Submit Answers</button>`;
+      questionsBox.style.display = 'block';
+    }
+
+    function submitFollowUp() {
+      const description = document.getElementById('description').value;
+      let extraInfo = '';
+      lastAskedQuestions.forEach((q, idx) => {
+        const answer = document.getElementById(`answer-${idx}`).value.trim();
+        if (answer) {
+          extraInfo += `${q} ${answer}. `;
+        }
+      });
+
+      document.getElementById('description').value = `${description} ${extraInfo}`;
+      document.getElementById('questions-box').style.display = 'none';
+      compareCars();
+    }
+  </script>
+</body>
+</html>
